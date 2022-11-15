@@ -269,22 +269,27 @@ for iout in nout:
         skip = False
         # backups = None
         if os.path.isfile(f"{resultdir}ytree_{iout:05d}.pickle"):
+            dprint_(f"[Queue] {iout} is done --> Skip\n", inidebugger)
             skip=True
             # backups = pklload(f"{resultdir}ytree_{iout:05d}.pickle")
             # if not p.overwrite:
             #     skip=True
         
         if os.path.isfile(f"{resultdir}ytree_{iout:05d}_temp.pickle"):
+            dprint_(f"[Queue] `{resultdir}ytree_{iout:05d}_temp.pickle` is found", inidebugger)
             istep = out2step(iout, galaxy=p.galaxy, mode=mode, nout=nout, nstep=nstep)
             cutstep = istep+5
             cutout = step2out(cutstep, galaxy=p.galaxy, mode=mode, nout=nout, nstep=nstep)
             if os.path.isfile(f"{resultdir}ytree_{cutout:05d}_temp.pickle"):
+                dprint_(f"[Queue] `{resultdir}ytree_{cutout:05d}_temp.pickle` is found --> Do\n", inidebugger)
                 skip=False
             else:
+                dprint_(f"[Queue] `{resultdir}ytree_{cutout:05d}_temp.pickle` is not found --> Skip\n", inidebugger)
                 skip=True
                 
         if not skip:
             # New log file
+            dprint_(f"[Queue] {iout} start\n", inidebugger)
             fname = make_logname(MyTree.simmode, iout, logprefix=MyTree.logprefix)
             # MyTree.debugger.handlers = []
             MyTree.debugger = custom_debugger(fname, detail=MyTree.detail)
