@@ -16,12 +16,12 @@ class Leaf():
         self.changed = True
         if backup is not None:
             backupstr = "w/ backup"
-            nout = backup['params']['nout']
+            # nout = backup['params']['nout']
             howmanystep = backup['params']['howmanystep']
             ncut = backup['params']['ncut']
             gal = backup['gal']          
             self.changed = False
-        self.nout = nout # Descending order
+        # self.nout = nout # Descending order
         self.cat = copy.deepcopy(gal)
         self.id = self.cat['id']
         self.iout = self.cat['timestep']
@@ -71,28 +71,16 @@ class Leaf():
             self.desc = None
             self.prog_score = None
             self.desc_score = None
-            # for i in range(howmanystep):
-            #     jstep = self.istep-i-1
-            #     if jstep > 0:
-            #         jout = nout[ len(nout)-jstep ]
-            #         self.prog[jout] = None
-            #         self.prog_score[jout] = None
-            #     jstep = self.istep+i+1
-            #     if jstep <= len(nout):
-            #         jout = nout[ len(nout)-jstep ]
-            #         self.desc[jout] = None
-            #         self.desc_score[jout] = None
             self.saved_matchrate = {}
             self.saved_veloffset = {}
-        # clock.done()
-    
-    def __del__(self):
-        dprint_(f"[DEL] {self._name} is deleted", self.debugger)
+            # clock.done()
+
             
     def name(self):
         return self._name
 
     def clear(self):
+        ref = MB()
         self.nparts = None
         self.pid = None
         self.pvx = None
@@ -105,6 +93,7 @@ class Leaf():
         self.desc_score = None
         self.saved_matchrate = {}
         self.saved_veloffset = {}    
+        self.mem += MB()-ref
 
 
             
@@ -120,7 +109,7 @@ class Leaf():
 
         backup = {}
         backup['gal'] = self.cat
-        backup['params'] = {'nout':self.nout, 'ncut':self.ncut, 'howmanystep':self.howmanystep}
+        backup['params'] = {'ncut':self.ncut, 'howmanystep':self.howmanystep}
         backup['part'] = {'nparts':self.nparts, 'id':self.pid, 'vx':self.pvx, 'vy':self.pvy, 'vz':self.pvz, 'weight':self.pweight}
         backup['saved'] = {'matchrate':self.saved_matchrate, 'veloffset':self.saved_veloffset}
 

@@ -107,6 +107,7 @@ MyTree = Treebase(simmode=mode, galaxy=p.galaxy, debugger=inidebugger, verbose=0
 def loadout(Tree:Treebase, iout:int, resultdir=None):
     func = f"[{inspect.stack()[0][3]}]"; prefix = f"{func}({iout}) "
     clock = timer(text=prefix, verbose=Tree.verbose, debugger=Tree.debugger)
+    mem = memory_tracker(prefix, Tree.debugger)
 
     backups=None
     if os.path.isfile(f"{resultdir}ytree_{iout:05d}_temp.pickle"):
@@ -126,25 +127,26 @@ def loadout(Tree:Treebase, iout:int, resultdir=None):
                 backup = backups[galid]
         Tree.load_leaf(iout, galid, backup=backup, prefix=prefix)
     clock2.done(add=f"({len(Tree.dict_gals['galaxymakers'][iout]['id'])} gals)")
-    Tree.flush(iout)
+    Tree.flush(iout, prefix=prefix)
 
+    mem.done()
     clock.done()
 
 def find_cands(Tree:Treebase, iout:int, jout:int, mcut=0.01, resultdir=None, prefix=""):
     func = f"[{inspect.stack()[0][3]}]"; prefix = f"{prefix}{func}({iout}<->{jout}) "
     clock = timer(text=prefix, verbose=Tree.verbose, debugger=Tree.debugger)
+    mem = memory_tracker(prefix, Tree.debugger)
 
     keys = list(Tree.dict_leaves[iout].keys())
     jhalos = None
     # backups = {}
     for key in keys:
-        leaf:Leaf = Tree.dict_leaves[iout][key]
         calc = True
-        if(leaf.prog is not None):
-            if(jout in leaf.prog[:,0]):
+        if(Tree.dict_leaves[iout][key].prog is not None):
+            if(jout in Tree.dict_leaves[iout][key].prog[:,0]):
                 calc=False
-        if(leaf.desc is not None):
-            if(jout in leaf.desc[:,0]):
+        if(Tree.dict_leaves[iout][key].desc is not None):
+            if(jout in Tree.dict_leaves[iout][key].desc[:,0]):
                 calc=False
         
         if calc:
@@ -153,7 +155,7 @@ def find_cands(Tree:Treebase, iout:int, jout:int, mcut=0.01, resultdir=None, pre
                     jhalos = Tree.part_halo_match[jout]
                 except:
                     _, jhalos = pklload(f"{resultdir}ytree_{jout:05d}_temp.pickle")
-            pid = leaf.pid
+            pid = Tree.dict_leaves[iout][key].pid
             pid = pid[pid <= len(jhalos)]
             hosts = jhalos[pid-1]
             hosts = hosts[hosts>0]
@@ -161,36 +163,36 @@ def find_cands(Tree:Treebase, iout:int, jout:int, mcut=0.01, resultdir=None, pre
             hosts = hosts[count/len(pid) > mcut]
             if len(hosts)>0:
                 otherleaves = [Tree.load_leaf(jout, iid) for iid in hosts]
-                ids, scores = leaf.calc_score(jout, otherleaves)
+                ids, scores = Tree.dict_leaves[iout][key].calc_score(jout, otherleaves)
             else:
                 ids = np.array([[jout, 0]])
                 scores = np.array([[-10, -10, -10, -10, -10]])
 
             if jout<iout:
-                leaf.prog = ids if leaf.prog is None else np.vstack((leaf.prog, ids))
-                leaf.prog_score = scores if leaf.prog_score is None else np.vstack((leaf.prog_score, scores))
-                leaf.changed = True
+                Tree.dict_leaves[iout][key].prog = ids if Tree.dict_leaves[iout][key].prog is None else np.vstack((Tree.dict_leaves[iout][key].prog, ids))
+                Tree.dict_leaves[iout][key].prog_score = scores if Tree.dict_leaves[iout][key].prog_score is None else np.vstack((Tree.dict_leaves[iout][key].prog_score, scores))
+                Tree.dict_leaves[iout][key].changed = True
             elif jout>iout:
-                leaf.desc = ids if leaf.desc is None else np.vstack((leaf.desc, ids))
-                leaf.desc_score = scores if leaf.desc_score is None else np.vstack((leaf.desc_score, scores))
-                leaf.changed = True
+                Tree.dict_leaves[iout][key].desc = ids if Tree.dict_leaves[iout][key].desc is None else np.vstack((Tree.dict_leaves[iout][key].desc, ids))
+                Tree.dict_leaves[iout][key].desc_score = scores if Tree.dict_leaves[iout][key].desc_score is None else np.vstack((Tree.dict_leaves[iout][key].desc_score, scores))
+                Tree.dict_leaves[iout][key].changed = True
             else:
                 raise ValueError(f"Same output {iout} and {jout}!")
         
         else:
             if jout<iout:
-                arg = leaf.prog[:,0]==jout
-                ids = leaf.prog[arg]
-                scores = leaf.prog_score[arg]
+                arg = Tree.dict_leaves[iout][key].prog[:,0]==jout
+                ids = Tree.dict_leaves[iout][key].prog[arg]
+                scores = Tree.dict_leaves[iout][key].prog_score[arg]
             elif jout>iout:
-                arg = leaf.desc[:,0]==jout
-                ids = leaf.desc[arg]
-                scores = leaf.desc_score[arg]
+                arg = Tree.dict_leaves[iout][key].desc[:,0]==jout
+                ids = Tree.dict_leaves[iout][key].desc[arg]
+                scores = Tree.dict_leaves[iout][key].desc_score[arg]
             else:
                 raise ValueError(f"Same output {iout} and {jout}!")
             
-        # backups[key] = leaf.selfsave()
-        msg = f"{prefix}<{leaf.name()}> has {len(ids)} candidates"
+        # backups[key] = Tree.dict_leaves[iout][key].selfsave()
+        msg = f"{prefix}<{Tree.dict_leaves[iout][key].name()}> has {len(ids)} candidates"
         if len(ids)>0:
             if np.sum(scores[0])>0:
                 if len(ids) < 6:
@@ -198,18 +200,20 @@ def find_cands(Tree:Treebase, iout:int, jout:int, mcut=0.01, resultdir=None, pre
                 else:
                     msg = f"{msg} {[f'{ids[i][-1]}({scores[i][0]:.3f})' for i in range(5)]+['...']}"
             else:
-                msg = f"{prefix}<{leaf.name()}> has {len(ids)-1} candidates"
+                msg = f"{prefix}<{Tree.dict_leaves[iout][key].name()}> has {len(ids)-1} candidates"
         dprint_(msg, Tree.debugger)
-    leaf = None
     # pklsave(backups, f"{resultdir}ytree_{iout:05d}.pickle", overwrite=True)
 
     clock.done()
+    mem.done()
 
 def LEAFbackup(Tree:Treebase, resultdir=None):
     iouts = list(Tree.dict_leaves.keys())
     for iout in iouts:
         prefix = f"[LEAFbackup]({iout})"
         clock = timer(text=prefix, verbose=Tree.verbose, debugger=Tree.debugger)
+        mem = memory_tracker(prefix, Tree.debugger)
+
         keys = list(Tree.dict_leaves[iout].keys())
         backups = {}
         if os.path.isfile(f"{resultdir}ytree_{iout:05d}_temp.pickle"):
@@ -225,6 +229,7 @@ def LEAFbackup(Tree:Treebase, resultdir=None):
         pklsave((backups, parthalomatch), f"{resultdir}ytree_{iout:05d}_temp.pickle", overwrite=True)
     
         clock.done()
+        mem.done()
 
 def reducebackup(Tree:Treebase, iout:int, resultdir=None):
     prefix = f"[Reduce Backup file] ({iout})"
@@ -311,3 +316,11 @@ for iout in nout:
         MyTree.debugger.error(e)
         MyTree.debugger.error(MyTree.summary())
         raise ValueError("Iteration is terminated")
+
+outs = list(MyTree.dict_leaves.keys())
+for out in outs:
+    MyTree.flush(out, leafclear=True)        
+    reducebackup(MyTree, out, resultdir=resultdir)
+
+dprint_("\nDone\n", inidebugger)
+print("\nDone\n")

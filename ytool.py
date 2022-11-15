@@ -21,6 +21,26 @@ class DotDict(dict):
         self.update(state)
         self.__dict__ = self
 
+class memory_tracker():
+    def __init__(self, prefix, debugger):
+        self.ref = MB()
+        self.prefix = prefix
+        self.debugger = debugger
+    
+    def done(self, cut=100):
+        new = MB() - self.ref
+        if self.debugger is not None:
+            if new > cut:
+                self.debugger.debug(f"{self.prefix} Allocate {new:.2f} MB")
+            elif new < -cut:
+                self.debugger.debug(f"{self.prefix} Deallocate {new:.2f} MB")
+        else:
+            if new > cut:
+                print(f"{self.prefix} Allocate {new:.2f} MB")
+            elif new < -cut:
+                print(f"{self.prefix} Deallocate {new:.2f} MB")
+        self.ref = MB()
+        
 class timer():
     __slots__ = ['ref', 'units', 'corr', 'unit', 'text', 'verbose', 'debugger', 'level']
     def __init__(self, unit="sec",text="", verbose=2, debugger=None, level='info'):
@@ -40,6 +60,8 @@ class timer():
                 self.debugger.info(f"{text} START")
             else:
                 self.debugger.debug(f"{text} START")
+        else:
+            print(f"{text} START")
     
     def done(self, add=None):
         elapse = time.time()-self.ref
@@ -52,6 +74,8 @@ class timer():
                 self.debugger.info(f"{self.text} Done ({elapse/self.corr:.3f} {self.unit})")
             else:
                 self.debugger.debug(f"{self.text} Done ({elapse/self.corr:.3f} {self.unit})")
+        else:
+            print(f"{self.text} Done ({elapse/self.corr:.3f} {self.unit})")
 
 def plot(**kwargs):
     import matplotlib.pyplot as plt
@@ -111,10 +135,13 @@ def custom_debugger(fname, detail=True):
     return root_logger
 
 def dprint_(msg, debugger, level='debug'):
-    if level=='debug':
-        debugger.debug(msg)
+    if debugger is not None:
+        if level=='debug':
+            debugger.debug(msg)
+        else:
+            debugger.info(msg)
     else:
-        debugger.info(msg)
+        print(msg)
 
 def mode2repo(mode):
     dp = True
