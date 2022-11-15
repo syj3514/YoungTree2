@@ -267,11 +267,22 @@ for iout in nout:
     try:
         ref = time.time()
         skip = False
-        backups = None
+        # backups = None
         if os.path.isfile(f"{resultdir}ytree_{iout:05d}.pickle"):
-            backups = pklload(f"{resultdir}ytree_{iout:05d}.pickle")
-            if not p.overwrite:
+            skip=True
+            # backups = pklload(f"{resultdir}ytree_{iout:05d}.pickle")
+            # if not p.overwrite:
+            #     skip=True
+        
+        if os.path.isfile(f"{resultdir}ytree_{iout:05d}_temp.pickle"):
+            istep = out2step(iout, galaxy=p.galaxy, mode=mode, nout=nout, nstep=nstep)
+            cutstep = istep+5
+            cutout = step2out(cutstep, galaxy=p.galaxy, mode=mode, nout=nout, nstep=nstep)
+            if os.path.isfile(f"{resultdir}ytree_{cutout:05d}_temp.pickle"):
+                skip=False
+            else:
                 skip=True
+                
         if not skip:
             # New log file
             fname = make_logname(MyTree.simmode, iout, logprefix=MyTree.logprefix)
