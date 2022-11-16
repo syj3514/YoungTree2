@@ -10,6 +10,10 @@
 #       "nh2":      NewHorizon2
 #       "nc":       NewCluster
 # mode = "y07206"
+#   [ncpu]
+#   Set nthread in numba
+#   If ncpu <=0, skip
+ncpu = 32
 
 #   [galaxy]
 #   Type of data

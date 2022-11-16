@@ -21,10 +21,10 @@ from yleaf import Leaf
 class Treebase():
     __slots__ = ['iniGB', 'iniMB', 'flush_GB', 'simmode', 'galaxy', 'logprefix', 'detail',
                 'partstr', 'Partstr', 'galstr', 'Galstr','verbose', 'debugger',
-                'rurmode', 'repo',
+                'rurmode', 'repo', 'ncpu',
                 'nout','nstep','dp', 'part_halo_match',
                 'dict_snap','dict_part','dict_gals','dict_leaves', 'branches_queue','resultdir']
-    def __init__(self, simmode='hagn', galaxy=True, flush_GB=50, verbose=2, debugger=None, prefix="", prog=True, logprefix="output_", detail=True, dp=False, resultdir=None):
+    def __init__(self, simmode='hagn', galaxy=True, flush_GB=50, verbose=2, debugger=None, prefix="", prog=True, logprefix="output_", detail=True, dp=False, resultdir=None, ncpu=0):
         func = f"[__Treebase__]"; prefix = f"{prefix}{func}"
         clock = timer(text=prefix, verbose=verbose, debugger=debugger)
         mem = memory_tracker(prefix, debugger)
@@ -51,6 +51,11 @@ class Treebase():
             self.Galstr = "HaloMaker"
         self.verbose = verbose
         self.debugger = debugger
+        self.ncpu = ncpu
+        if self.ncpu>0:
+            from numba import set_num_threads
+            set_num_threads(self.ncpu)
+
 
         self.repo, self.rurmode, _ = mode2repo(simmode)
 
@@ -67,6 +72,7 @@ class Treebase():
         clock.done()
 
     def summary(self, isprint=False):
+        gc.collect()
         temp = [f"{key}({sys.getsizeof(self.dict_snap[key].part_data) / 2**20:.2f} MB) | " for key in self.dict_snap.keys()]
         tsnap = "".join(temp)
         
@@ -88,9 +94,14 @@ class Treebase():
         temp = []
         for key in self.dict_leaves.keys():
             temp += f"\t{key}: {len(self.dict_leaves[key])} leaves\n"
-        tleaf = "".join(temp)
+        tleaf = "".join(temp)        
+
+        temp = []
+        for key in self.part_halo_match.keys():
+            temp += f"\t{key}: {len(self.part_halo_match[key])} matched parts\n"
+        tmatch = "".join(temp)
         
-        text = f"\n[Tree Data Report]\n\n>>> Snapshot\n{tsnap}\n>>> {self.Partstr}\n{tpart}>>> {self.Galstr}\n{tgm}>>> Leaves\n{tleaf}\n>>> Used Memory: {psutil.Process().memory_info().rss / 2 ** 30:.4f} GB\n"
+        text = f"\n[Tree Data Report]\n\n>>> Snapshot\n{tsnap}>>> {self.Partstr}\n{tpart}>>> {self.Galstr}\n{tgm}>>> Leaves\n{tleaf}>>> Matched particles\n{tmatch}\n>>> Used Memory: {psutil.Process().memory_info().rss / 2 ** 30:.4f} GB\n"
 
         if isprint:
             print(text)
@@ -103,9 +114,9 @@ class Treebase():
         if not iout in self.dict_snap.keys():
             func = f"[{inspect.stack()[0][3]}]"; prefix = f"{prefix}{func}({iout}) "
             mem = memory_tracker(prefix, self.debugger)
-            clock = timer(text=prefix, verbose=self.verbose, debugger=self.debugger)
+            # clock = timer(text=prefix, verbose=self.verbose, debugger=self.debugger)
             self.dict_snap[iout] = uri.RamsesSnapshot(self.repo, iout, mode=self.rurmode, path_in_repo='snapshots')
-            clock.done()
+            # clock.done()
             mem.done()
         if not iout in self.dict_part.keys():
             self.dict_part[iout] = {}
@@ -122,7 +133,7 @@ class Treebase():
         if return_part:
             if not iout in self.dict_gals["gmpids"].keys():
                 func = f"[{inspect.stack()[0][3]}]"; prefix = f"{prefix}{func}({iout}) "
-                clock = timer(text=prefix, verbose=self.verbose, debugger=self.debugger)
+                # clock = timer(text=prefix, verbose=self.verbose, debugger=self.debugger)
                 mem = memory_tracker(prefix, self.debugger)
 
                 snap = self.load_snap(iout, prefix=prefix)
@@ -133,12 +144,12 @@ class Treebase():
                 self.dict_gals["gmpids"][iout] = gmpid #<-- Bottleneck!
                 del gm; del gmpid; del cumparts
 
-                clock.done()
+                # clock.done()
                 mem.done()
         else:
             if not iout in self.dict_gals["galaxymakers"].keys():
                 func = f"[{inspect.stack()[0][3]}]"; prefix = f"{prefix}{func}({iout}) "
-                clock = timer(text=prefix, verbose=self.verbose, debugger=self.debugger)
+                # clock = timer(text=prefix, verbose=self.verbose, debugger=self.debugger)
                 mem = memory_tracker(prefix, self.debugger)
 
                 snap = self.load_snap(iout, prefix=prefix)
@@ -146,7 +157,7 @@ class Treebase():
                 self.dict_gals["galaxymakers"][iout] = gm
                 del gm
 
-                clock.done()
+                # clock.done()
                 mem.done()
 
         # Load
@@ -184,7 +195,7 @@ class Treebase():
                     break
             if calc:
                 func = f"[{inspect.stack()[0][3]}]"; prefix = f"{prefix}{func}({iout} all) "
-                clock = timer(text=prefix, verbose=self.verbose, debugger=self.debugger)
+                # clock = timer(text=prefix, verbose=self.verbose, debugger=self.debugger)
                 mem = memory_tracker(prefix, self.debugger)
 
                 snap.box = np.array([[0, 1], [0, 1], [0, 1]])
@@ -216,15 +227,20 @@ class Treebase():
                     else:
                         pass
                     
-
-                clock.done()
+                del arg
+                del gals
+                del gpids
+                del gpids_flat
+                del haloids
+                del snap
+                # clock.done()
                 mem.done()
             return self.dict_snap[iout].part
 
         else:
             if not galid in self.dict_part[iout].keys():
                 func = f"[{inspect.stack()[0][3]}]"; prefix = f"{prefix}{func}({iout}) "
-                clock = timer(text=prefix, verbose=self.verbose, debugger=self.debugger)
+                # clock = timer(text=prefix, verbose=self.verbose, debugger=self.debugger)
                 mem = memory_tracker(prefix, self.debugger)
 
                 cpulist = snap.get_halos_cpulist( np.atleast_1d(self.load_gals(iout, galid=galid)), radius=1.5, radius_name='r' )
@@ -238,7 +254,7 @@ class Treebase():
                     part = snap.Particle(part, snap)
                 self.dict_part[iout][gal['id']] = part
             
-                clock.done()
+                # clock.done()
                 mem.done()
             return self.dict_part[iout][galid]
 
@@ -253,12 +269,13 @@ class Treebase():
         if not galid in self.dict_leaves[iout].keys():
             ref = MB()
             if backup is not None:
+                dprint_(f"backup is not None, but not in dict ({galid} at {iout})", self.debugger)
                 gal = None
                 part = None
             else:
                 gal = self.load_gals(iout, galid, return_part=False, prefix=prefix)
                 part = self.load_part(iout, galid, prefix=prefix)
-            self.dict_leaves[iout][galid] = Leaf(gal, part, self.nout, verbose=self.verbose-1, prefix=prefix, debugger=self.debugger, backup=backup)
+            self.dict_leaves[iout][galid] = Leaf(gal, part, self.nout, verbose=self.verbose-1, prefix=prefix, debugger=self.debugger, backup=backup, ncpu=self.ncpu)
             self.dict_leaves[iout][galid].mem = MB()-ref
 
         
@@ -276,6 +293,8 @@ class Treebase():
                 self.dict_leaves[iout][jkey].debugger = self.debugger
     
     def flush(self, iout:int, prefix="", leafclear=False, debugger=None):
+        func = f"[{inspect.stack()[0][3]}]"; prefix = f"{prefix}{func}({iout}) "
+
         if debugger is None:
             debugger = self.debugger
         mem = memory_tracker(prefix, debugger)
@@ -307,7 +326,7 @@ class Treebase():
             keys = list(self.dict_leaves.keys())
             if iout in keys:
                 func = f"[{inspect.stack()[0][3]}]"; prefix1 = f"{prefix}{func}({iout}) "
-                clock = timer(text=prefix1, verbose=self.verbose, debugger=debugger)
+                # clock = timer(text=prefix1, verbose=self.verbose, debugger=debugger)
 
                 keys2 = list(self.dict_leaves[iout].keys())
                 for key in keys2:
@@ -315,7 +334,7 @@ class Treebase():
                     del self.dict_leaves[iout][key]
                 del self.dict_leaves[iout]
                 
-                clock.done()
+                # clock.done()
 
             keys = list(self.part_halo_match.keys())
             if iout in keys:

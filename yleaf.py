@@ -6,14 +6,18 @@ import copy
 
 from ytool import *
 from typing import List
+from numba import set_num_threads
 # from yroot import Treebase
 
 
 class Leaf():
-    def __init__(self, gal, parts, nout, howmanystep=5, ncut=None, verbose=1, prefix="", debugger=None, backup:dict=None):
+    def __init__(self, gal, parts, nout, howmanystep=5, ncut=None, verbose=1, prefix="", debugger=None, backup:dict=None, ncpu=0):
         # Setting
         backupstr = "w/o backup"
         self.changed = True
+        self.ncpu = ncpu
+        if self.ncpu>0:
+            set_num_threads(self.ncpu)
         if backup is not None:
             backupstr = "w/ backup"
             # nout = backup['params']['nout']
@@ -80,7 +84,6 @@ class Leaf():
         return self._name
 
     def clear(self):
-        ref = MB()
         self.nparts = None
         self.pid = None
         self.pvx = None
@@ -93,7 +96,11 @@ class Leaf():
         self.desc_score = None
         self.saved_matchrate = {}
         self.saved_veloffset = {}    
-        self.mem += MB()-ref
+        self.prog = []    
+        self.prog_score = []    
+        self.desc = []    
+        self.desc_score = []    
+        self.cat = None
 
 
             
@@ -141,7 +148,7 @@ class Leaf():
             if otherleaf.id in self.saved_matchrate[jout].keys():
                 val, ind = self.saved_matchrate[jout][otherleaf.id]
                 calc = False
-        if calc:        
+        if calc:
             ind = large_isin(self.pid, otherleaf.pid)
             if not True in ind:
                 val = -1
@@ -162,9 +169,12 @@ class Leaf():
 
         weights = self.pweight[checkind]
         weights /= np.sum(weights)
-        vx = np.convolve( self.pvx[checkind], weights[::-1], mode='valid' )[0] - self.cat['vx']
-        vy = np.convolve( self.pvy[checkind], weights[::-1], mode='valid' )[0] - self.cat['vy']
-        vz = np.convolve( self.pvz[checkind], weights[::-1], mode='valid' )[0] - self.cat['vz']
+        # vx = np.convolve( self.pvx[checkind], weights[::-1], mode='valid' )[0] - self.cat['vx']
+        # vy = np.convolve( self.pvy[checkind], weights[::-1], mode='valid' )[0] - self.cat['vy']
+        # vz = np.convolve( self.pvz[checkind], weights[::-1], mode='valid' )[0] - self.cat['vz']
+        vx = nbsum( self.pvx[checkind], weights ) - self.cat['vx']
+        vy = nbsum( self.pvy[checkind], weights ) - self.cat['vy']
+        vz = nbsum( self.pvz[checkind], weights ) - self.cat['vz']
 
         return np.array([vx, vy, vz])
     

@@ -6,6 +6,65 @@ import os
 import numpy as np
 import numba as nb
 from collections.abc import Iterable
+import inspect
+import traceback
+import sys
+import importlib
+
+params = importlib.import_module("params")
+ncpu = params.__dict__['ncpu']
+if ncpu <=0:
+    from numba.core.config import NUMBA_NUM_THREADS
+    ncpu = NUMBA_NUM_THREADS
+class DebugDecorator:
+    def __init__(self, f, ontime=True, onmem=True, oncpu=True):
+        self.func = f
+        self.ontime=ontime
+        self.onmem=onmem
+        self.oncpu=oncpu
+
+    def __call__(self, *args, **kwargs):
+        debugger = args[0].debugger
+        prefix = f"[{self.func.__name__}] "
+        if self.ontime:
+            self.clock=timer(text=prefix, debugger=debugger, verbose=0)
+        if self.onmem:
+            self.mem = MB()
+        if self.oncpu:
+            self.cpu = DisplayCPU()
+            self.cpu.iq = 0
+            self.cpu.queue = np.zeros(100)-1
+            self.cpu.start()
+        self.func(*args, **kwargs)
+        if self.ontime:
+            self.clock.done()
+        if self.onmem:
+            debugger.debug(f"{prefix}  mem ({MB() - self.mem:.2f} MB) [{self.mem:.2f} -> {MB():.2f}]")
+        if self.oncpu:
+            self.cpu.stop()
+            icpu = self.cpu.queue[self.cpu.queue >= 0]
+            if len(icpu)>0:
+                q16, q50, q84 = np.percentile(icpu, q=[16,50,84])
+            else:
+                q16 = q50 = q84 = 0
+            debugger.debug(f"{prefix}  cpu ({q50:.2f} %) [{q16:.1f} ~ {q84:.1f}]")
+
+
+import threading
+class DisplayCPU(threading.Thread):
+    def run(self):
+        self.running = True
+        currentProcess = psutil.Process()
+        while self.running and self.iq<1000:
+            if self.iq < 100:
+                self.queue[self.iq] = currentProcess.cpu_percent(interval=0.5)
+            else:
+                self.queue[np.argmin(self.queue)] = max(currentProcess.cpu_percent(interval=1), self.queue[np.argmin(self.queue)])
+            self.iq += 1
+
+    def stop(self):
+        self.running = False
+        
 
 class DotDict(dict):
     """dot.notation access to dictionary attributes"""
@@ -27,7 +86,7 @@ class memory_tracker():
         self.prefix = prefix
         self.debugger = debugger
     
-    def done(self, cut=100):
+    def done(self, cut=50):
         new = MB() - self.ref
         if self.debugger is not None:
             if new > cut:
@@ -216,16 +275,28 @@ def out2step(iout, galaxy=True, mode='hagn', nout=None, nstep=None):
         nout = load_nout(mode=mode, galaxy=galaxy)
     if nstep is None:
         nstep = load_nstep(mode=mode, galaxy=galaxy, nout=nout)
-    arg = np.argwhere(iout==nout)[0][0]
-    return nstep[arg]
+    try:
+        arg = np.argwhere(iout==nout)[0][0]
+        return nstep[arg]
+    except IndexError:
+        print()
+        traceback.print_stack()
+        sys.exit(f"\n!!! {iout} is not in nout({np.min(nout)}~{np.max(nout)}) !!!\n")
 
 def step2out(istep, galaxy=True, mode='hagn', nout=None, nstep=None):
     if nout is None:
         nout = load_nout(mode=mode, galaxy=galaxy)
     if nstep is None:
         nstep = load_nstep(mode=mode, galaxy=galaxy, nout=nout)
-    arg = np.argwhere(istep==nstep)[0][0]
-    return nout[arg]
+    try:
+        arg = np.argwhere(istep==nstep)[0][0]
+        return nout[arg]
+    except IndexError:
+        print()
+        traceback.print_stack()
+        sys.exit(f"\n!!! {istep} is not in nstep({np.min(nstep)}~{np.max(nstep)}) !!!\n")
+        
+    
 
 def ioutistep(gal, galaxy=True, mode='hagn', nout=None, nstep=None):
     if 'nparts' in gal.dtype.names:
@@ -260,11 +331,18 @@ def pklsave(data,fname, overwrite=False):
     '''
     pklsave(array, 'repo/fname.pickle', overwrite=False)
     '''
-    if overwrite == False and os.path.isfile(fname):
-        raise ValueError(f"{fname} already exist!!")
+    if os.path.isfile(fname):
+        if overwrite == False:
+            raise FileExistsError(f"{fname} already exist!!")
+        else:
+            with open(f"{fname}.pkl", 'wb') as handle:
+                pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            os.remove(fname)
+            os.rename(f"{fname}.pkl", fname)
     else:
-        with open(fname, 'wb') as handle:
+        with open(f"{fname}", 'wb') as handle:
             pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
 
 def pklload(fname):
     '''
@@ -356,11 +434,21 @@ def rms(*args):
 
 @nb.njit(fastmath=True)
 def nbnorm(l):
+    set_num_threads(ncpu)
     s = 0.
     for i in range(l.shape[0]):
         s += l[i]**2
     return np.sqrt(s)
 
+@nb.njit(fastmath=True)
+def nbsum(a:np.ndarray,b:np.ndarray)->float:
+    n:int = len(a)
+    s:float = 0.
+    for i in nb.prange(n):
+        s += a[i]*b[i]
+    return s
+
+from numba import set_num_threads
 @nb.jit(parallel=True)
 def large_isin(a, b):
     '''
@@ -373,6 +461,7 @@ def large_isin(a, b):
     >>> large_isin(a,b)
     [False, True, False, True, False, True]
     '''
+    set_num_threads(ncpu)
     n = len(a)
     result = np.full(n, False)
     set_b = set(b)
@@ -393,6 +482,7 @@ def large_isind(a, b):
     >>> large_isin(a,b)
     [False, True, False, True, False, True]
     '''
+    set_num_threads(ncpu)
     n = len(a)
     result = np.full(n, False)
     set_b = set(b)
@@ -406,6 +496,7 @@ def atleast_numba(a, b):
     '''
     Return True if any element of a is in b
     '''
+    set_num_threads(ncpu)
     n = len(a)
     set_b = set(b)
     for i in nb.prange(n):
@@ -418,6 +509,7 @@ def atleast_numba_para(aa, b):
     '''
     Return True if any element of a is in b
     '''
+    set_num_threads(ncpu)
     # nn = len(aa) # <- Fall-back from the nopython compilation path to the object mode compilation path has been detected, this is deprecated behaviour.
     nn = len(aa) # <- Function "atleast_numba_para" was compiled in object mode without forceobj=True, but has lifted loops.
     results = np.full(nn, False)
