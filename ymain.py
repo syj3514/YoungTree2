@@ -124,33 +124,33 @@ class Main:
             func = f"[{inspect.stack()[0][3]}]"; prefix = f"{func}({iout}) "
 
             backups=None
-            dprint_(f"#1 {MB():.4f}")
+            # dprint_(f"#1 {MB():.4f}", Tree.debugger)
             if os.path.isfile(f"{resultdir}ytree_{iout:05d}_temp.pickle"):
                 dprint_(f"{prefix} load from `{resultdir}ytree_{iout:05d}_temp.pickle`", Tree.debugger)
                 backups, _ = pklload(f"{resultdir}ytree_{iout:05d}_temp.pickle")
-            dprint_(f"#2 {MB():.4f}")
+            # dprint_(f"#2 {MB():.4f}", Tree.debugger)
             Tree.load_snap(iout, prefix=prefix)
-            dprint_(f"#3 {MB():.4f}")
+            # dprint_(f"#3 {MB():.4f}", Tree.debugger)
             if backups is None:
                 Tree.load_gals(iout, galid='all', return_part=True, prefix=prefix)
-                dprint_(f"#4-1 {MB():.4f}")
+                # dprint_(f"#4-1 {MB():.4f}", Tree.debugger)
                 Tree.load_part(iout, galid='all', prefix=prefix)
-                dprint_(f"#4-2 {MB():.4f}")
+                # dprint_(f"#4-2 {MB():.4f}", Tree.debugger)
             else:
                 Tree.load_gals(iout, galid='all', return_part=False, prefix=prefix)
-                dprint_(f"#4-3 {MB():.4f}")
+                # dprint_(f"#4-3 {MB():.4f}", Tree.debugger)
             for galid in Tree.dict_gals['galaxymakers'][iout]['id']:
                 backup = None
                 if (backups is not None):
                     if galid in backups.keys():
                         backup = backups[galid]
                 Tree.load_leaf(iout, galid, backup=backup, prefix=prefix)
-            dprint_(f"#5 {MB():.4f}")
+            # dprint_(f"#5 {MB():.4f}", Tree.debugger)
             Tree.flush(iout, prefix=prefix)
-            dprint_(f"#6 {MB():.4f}")
+            # dprint_(f"#6 {MB():.4f}", Tree.debugger)
             backups = None; del backups
             backup = None; del backup
-            dprint_(f"#7 {MB():.4f}")
+            # dprint_(f"#7 {MB():.4f}", Tree.debugger)
 
         return _loadout_debug(Tree, iout, resultdir=resultdir)
     
@@ -449,12 +449,7 @@ def treerecord(iout, nout, elapse_s, total_elapse_s, debugger:logging.Logger):
 
 
 
-
-
-
-uri.timer.verbose=0
-reftot = time.time()
-for iout in nout:
+def do_onestep(iout, reftot):
     try:
         ref = time.time()
         skip = False
@@ -536,8 +531,15 @@ for iout in nout:
         MyTree.debugger.error(e)
         MyTree.debugger.error(MyTree.summary())
         sys.exit("Iteration is terminated")
-        # raise ValueError("Iteration is terminated")
-        
+    return main
+
+
+
+
+uri.timer.verbose=0
+reftot = time.time()
+for iout in nout:
+    main = do_onestep(iout, reftot)
 
 outs = list(MyTree.dict_leaves.keys())
 for out in outs:
@@ -546,3 +548,95 @@ for out in outs:
 
 dprint_("\nDone\n", inidebugger)
 print("\nDone\n")
+# for iout in nout:
+#     try:
+#         ref = time.time()
+#         skip = False
+#         # backups = None
+#         if os.path.isfile(f"{resultdir}ytree_{iout:05d}.pickle"):
+#             dprint_(f"[Queue] {iout} is done --> Skip\n", inidebugger)
+#             skip=True
+#             # backups = pklload(f"{resultdir}ytree_{iout:05d}.pickle")
+#             # if not p.overwrite:
+#             #     skip=True
+        
+#         if os.path.isfile(f"{resultdir}ytree_{iout:05d}_temp.pickle"):
+#             dprint_(f"[Queue] `{resultdir}ytree_{iout:05d}_temp.pickle` is found", inidebugger)
+#             istep = out2step(iout, galaxy=p.galaxy, mode=mode, nout=nout, nstep=nstep)
+#             cutstep = istep+5
+#             if cutstep <= np.max(nstep):
+#                 cutout = step2out(cutstep, galaxy=p.galaxy, mode=mode, nout=nout, nstep=nstep)
+#                 if os.path.isfile(f"{resultdir}ytree_{cutout:05d}_temp.pickle"):
+#                     dprint_(f"[Queue] `{resultdir}ytree_{cutout:05d}_temp.pickle` is found --> Do\n", inidebugger)
+#                     skip=False
+#                 else:
+#                     dprint_(f"[Queue] `{resultdir}ytree_{cutout:05d}_temp.pickle` is not found --> Skip\n", inidebugger)
+#                     skip=True
+#             else:
+#                 skip=False
+                
+#         if not skip:
+#             # New log file
+#             dprint_(f"[Queue] {iout} start\n", inidebugger)
+#             fname = make_logname(MyTree.simmode, iout, logprefix=MyTree.logprefix)
+#             # MyTree.debugger.handlers = []
+#             MyTree.debugger = custom_debugger(fname, detail=MyTree.detail)
+#             MyTree.update_debugger()
+#             MyTree.debugger.info(f"\n{MyTree.summary()}\n")
+#             main = Main(MyTree, resultdir)
+#             # Load snap gal part
+#             dprint_(f"\n\nStart at iout={iout}\n", MyTree.debugger, level='info')
+#             # loadout(MyTree, iout, resultdir=resultdir)
+#             main.loadout_debug(iout)
+#             istep = out2step(iout, galaxy=p.galaxy, mode=mode, nout=nout, nstep=nstep)
+#             for j in range(p.nsnap):
+#                 jstep = istep-j-1
+#                 if jstep > 0:
+#                     jout = step2out(jstep, galaxy=p.galaxy, mode=mode, nout=nout, nstep=nstep)
+#                     dprint_(f"\n\nProgenitor at jout={jout}\n", MyTree.debugger, level='info')
+#                     # loadout(MyTree, jout, resultdir=resultdir)
+#                     main.loadout_debug(jout)
+#                     # find_cands(MyTree, iout, jout, resultdir=resultdir)
+#                     main.find_cands_debug(iout, jout)
+#             for j in range(p.nsnap):
+#                 jstep = istep+j+1
+#                 if jstep <= np.max(nstep):
+#                     jout = step2out(jstep, galaxy=p.galaxy, mode=mode, nout=nout, nstep=nstep)
+#                     if not jout in MyTree.dict_snap.keys():
+#                         dprint_(f"\n\nDescendant at jout={jout}\n", MyTree.debugger, level='info')
+#                         # loadout(MyTree, jout, resultdir=resultdir)
+#                         main.loadout_debug(jout)
+#                         # find_cands(MyTree, iout, jout, resultdir=resultdir)
+#                         main.find_cands_debug(iout, jout)
+#             dprint_(f"\n\n", MyTree.debugger, level='info')
+#             cutstep = istep+5
+#             if cutstep<=np.max(nstep):
+#                 cutout = step2out(cutstep, galaxy=p.galaxy, mode=mode, nout=nout, nstep=nstep)
+#                 outs = list(MyTree.dict_leaves.keys())
+#                 for out in outs:
+#                     if out > cutout:
+#                         MyTree.flush(out, leafclear=True)        
+#                         # reducebackup(MyTree, out, resultdir=resultdir)
+#                         main.reducebackup_debug(out)
+            
+#             # LEAFbackup(MyTree, resultdir=resultdir)
+#             main.LEAFbackup_debug()
+#             MyTree.debugger.info(f"\n{MyTree.summary()}\n")
+#             treerecord(iout, nout, time.time()-ref, time.time()-reftot, inidebugger)
+#     except Exception as e:
+#         print(traceback.format_exc())
+#         print(e)
+#         MyTree.debugger.error(traceback.format_exc())
+#         MyTree.debugger.error(e)
+#         MyTree.debugger.error(MyTree.summary())
+#         sys.exit("Iteration is terminated")
+#         # raise ValueError("Iteration is terminated")
+        
+
+# outs = list(MyTree.dict_leaves.keys())
+# for out in outs:
+#     MyTree.flush(out, leafclear=True)        
+#     main.reducebackup_debug(out)
+
+# dprint_("\nDone\n", inidebugger)
+# print("\nDone\n")

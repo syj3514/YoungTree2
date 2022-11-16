@@ -343,7 +343,6 @@ class Treebase():
                 for key in keys2:
                     self.dict_leaves[iout][key].clear()
                     del self.dict_leaves[iout][key]
-                    print(gc.get)
                 del self.dict_leaves[iout]
                 mem.done(cut=-0.001)
                 
