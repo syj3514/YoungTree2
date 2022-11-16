@@ -124,24 +124,33 @@ class Main:
             func = f"[{inspect.stack()[0][3]}]"; prefix = f"{func}({iout}) "
 
             backups=None
+            dprint_(f"#1 {MB():.4f}")
             if os.path.isfile(f"{resultdir}ytree_{iout:05d}_temp.pickle"):
                 dprint_(f"{prefix} load from `{resultdir}ytree_{iout:05d}_temp.pickle`", Tree.debugger)
                 backups, _ = pklload(f"{resultdir}ytree_{iout:05d}_temp.pickle")
+            dprint_(f"#2 {MB():.4f}")
             Tree.load_snap(iout, prefix=prefix)
+            dprint_(f"#3 {MB():.4f}")
             if backups is None:
                 Tree.load_gals(iout, galid='all', return_part=True, prefix=prefix)
+                dprint_(f"#4-1 {MB():.4f}")
                 Tree.load_part(iout, galid='all', prefix=prefix)
+                dprint_(f"#4-2 {MB():.4f}")
             else:
                 Tree.load_gals(iout, galid='all', return_part=False, prefix=prefix)
+                dprint_(f"#4-3 {MB():.4f}")
             for galid in Tree.dict_gals['galaxymakers'][iout]['id']:
                 backup = None
                 if (backups is not None):
                     if galid in backups.keys():
                         backup = backups[galid]
                 Tree.load_leaf(iout, galid, backup=backup, prefix=prefix)
+            dprint_(f"#5 {MB():.4f}")
             Tree.flush(iout, prefix=prefix)
+            dprint_(f"#6 {MB():.4f}")
             backups = None; del backups
             backup = None; del backup
+            dprint_(f"#7 {MB():.4f}")
 
         return _loadout_debug(Tree, iout, resultdir=resultdir)
     

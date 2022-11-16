@@ -90,14 +90,14 @@ class memory_tracker():
         new = MB() - self.ref
         if self.debugger is not None:
             if new > cut:
-                self.debugger.debug(f"{self.prefix} Allocate {new:.2f} MB")
+                self.debugger.debug(f"{self.prefix} Gain {new:.2f} MB")
             elif new < -cut:
-                self.debugger.debug(f"{self.prefix} Deallocate {new:.2f} MB")
+                self.debugger.debug(f"{self.prefix} Loss {new:.2f} MB")
         else:
             if new > cut:
-                print(f"{self.prefix} Allocate {new:.2f} MB")
+                print(f"{self.prefix} Gain {new:.2f} MB")
             elif new < -cut:
-                print(f"{self.prefix} Deallocate {new:.2f} MB")
+                print(f"{self.prefix} Loss {new:.2f} MB")
         self.ref = MB()
         
 class timer():

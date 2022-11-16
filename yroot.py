@@ -270,8 +270,9 @@ class Treebase():
             ref = MB()
             if backup is not None:
                 dprint_(f"backup is not None, but not in dict ({galid} at {iout})", self.debugger)
-                gal = None
-                part = None
+                # nobody use this
+                gal = iout
+                part = galid
             else:
                 gal = self.load_gals(iout, galid, return_part=False, prefix=prefix)
                 part = self.load_part(iout, galid, prefix=prefix)
@@ -297,34 +298,44 @@ class Treebase():
 
         if debugger is None:
             debugger = self.debugger
-        mem = memory_tracker(prefix, debugger)
+        mem0 = memory_tracker(prefix, debugger)
+        
         keys = list(self.dict_snap.keys())
         if iout in keys:
+            mem = memory_tracker(prefix+"snap ", debugger)
             self.dict_snap[iout].clear()
             del self.dict_snap[iout]
+            mem.done(cut=-0.001)
         
         keys = list(self.dict_gals['galaxymakers'].keys())
         if iout in keys:
+            mem = memory_tracker(prefix+"galm ", debugger)
             self.dict_gals['galaxymakers'][iout] = []
             del self.dict_gals['galaxymakers'][iout]
+            mem.done(cut=-0.001)
         
         keys = list(self.dict_gals['gmpids'].keys())
         if iout in keys:
+            mem = memory_tracker(prefix+"gpid ", debugger)
             self.dict_gals['gmpids'][iout] = []
             del self.dict_gals['gmpids'][iout]
+            mem.done(cut=-0.001)
         
         keys = list(self.dict_part.keys())
         if iout in keys:
+            mem = memory_tracker(prefix+"part ", debugger)
             keys2 = list(self.dict_part[iout].keys())
             for key in keys2:
                 self.dict_part[iout][key].snap.clear()
                 self.dict_part[iout][key].table = []
                 del self.dict_part[iout][key]
             del self.dict_part[iout]
+            mem.done(cut=-0.001)
         
         if leafclear:
             keys = list(self.dict_leaves.keys())
             if iout in keys:
+                mem = memory_tracker(prefix+"leaf ", debugger)
                 func = f"[{inspect.stack()[0][3]}]"; prefix1 = f"{prefix}{func}({iout}) "
                 # clock = timer(text=prefix1, verbose=self.verbose, debugger=debugger)
 
@@ -332,16 +343,20 @@ class Treebase():
                 for key in keys2:
                     self.dict_leaves[iout][key].clear()
                     del self.dict_leaves[iout][key]
+                    print(gc.get)
                 del self.dict_leaves[iout]
+                mem.done(cut=-0.001)
                 
                 # clock.done()
 
             keys = list(self.part_halo_match.keys())
             if iout in keys:
-                self.part_halo_match[key] = []
-                del self.part_halo_match[key]
+                mem = memory_tracker(prefix+"mach ", debugger)
+                self.part_halo_match[iout] = []
+                del self.part_halo_match[iout]
+                mem.done(cut=-0.001)
         gc.collect()
-        mem.done()
+        mem0.done(cut=-0.001)
         
         
         
