@@ -6,7 +6,6 @@ import os
 import numpy as np
 import numba as nb
 from collections.abc import Iterable
-import inspect
 import traceback
 import sys
 import importlib
@@ -39,7 +38,7 @@ class DebugDecorator:
         if self.ontime:
             self.clock.done()
         if self.onmem:
-            debugger.debug(f"{prefix}  mem ({MB() - self.mem:.2f} MB) [{self.mem:.2f} -> {MB():.2f}]")
+            debugger.info(f"{prefix}  mem ({MB() - self.mem:.2f} MB) [{self.mem:.2f} -> {MB():.2f}]")
         if self.oncpu:
             self.cpu.stop()
             icpu = self.cpu.queue[self.cpu.queue >= 0]
@@ -47,7 +46,7 @@ class DebugDecorator:
                 q16, q50, q84 = np.percentile(icpu, q=[16,50,84])
             else:
                 q16 = q50 = q84 = 0
-            debugger.debug(f"{prefix}  cpu ({q50:.2f} %) [{q16:.1f} ~ {q84:.1f}]")
+            debugger.info(f"{prefix}  cpu ({q50:.2f} %) [{q16:.1f} ~ {q84:.1f}]")
 
 
 import threading
