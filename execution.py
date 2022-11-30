@@ -6,7 +6,12 @@ from YoungTree3.ymain import do_onestep
 import importlib
 import sys
 
-params = importlib.import_module("params")
+if len(sys.argv) < 3:
+    params = importlib.import_module("params")
+else:
+    params = sys.argv[2]
+    if params[-3:] == '.py':
+        params = importlib.import_module(params[:-3])
 #########################################################
 #   From params.py, record to dictionary
 #########################################################
@@ -40,15 +45,19 @@ modenames = {"hagn": "Horizon-AGN",
             "nh": "NewHorizon",
             "nh2": "NewHorizon2",
             "nc": "NewCluster",
-            "fornax": "FORNAX"
+            "fornax": "FORNAX",
+            "custom": "Custom"
             }
 
 #########################################################
 #   Mode Configuration
 #########################################################
-mode = sys.argv[1]
+
 if len(sys.argv) < 2:
     mode = input("mode=? ")
+else:
+    mode = sys.argv[1]
+
 if not mode in modenames.keys():
     raise ValueError(f"`{mode}` is not supported!\nSee {list(modenames.keys())}")
 modename = modenames[mode]
@@ -77,7 +86,7 @@ inidebugger = None
 resultdir = f"{repo}/YoungTree/"
 if not os.path.isdir(resultdir):
     os.mkdir(resultdir)
-fname = make_logname(mode, -1, logprefix=p.logprefix)
+fname = make_logname(mode, -1, logprefix=p.logprefix, dirname=resultdir)
 # repo/YoungTree/ytree_ini.log
 inidebugger = custom_debugger(fname, detail=p.detail)
 inihandlers = inidebugger.handlers
@@ -106,7 +115,7 @@ MyTree = Treebase(simmode=mode, galaxy=p.galaxy, debugger=inidebugger, verbose=0
 uri.timer.verbose=0
 reftot = time.time()
 for iout in nout:
-    main = do_onestep(iout, reftot)
+    main = do_onestep(MyTree,iout, p, inidebugger, reftot=reftot, mode=mode, nout=nout, nstep=nstep, resultdir=resultdir)
 
 outs = list(MyTree.dict_leaves.keys())
 for out in outs:

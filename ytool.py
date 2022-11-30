@@ -142,7 +142,7 @@ def plot(**kwargs):
     ax.set_facecolor("k")
     return fig, ax
 
-def make_logname(mode, iout, dirname=None, logprefix=None, overwrite=False):
+def make_logname(mode, iout, dirname=None, logprefix=None, overwrite=False, specific=None):
     if dirname is None:
         dirname = mode2repo(mode)[0]
         dirname = f"{dirname}/YoungTree"
@@ -153,17 +153,23 @@ def make_logname(mode, iout, dirname=None, logprefix=None, overwrite=False):
     if logprefix[-1] != "_":
         logprefix = f"{logprefix}_"
 
-    if iout<0:
-        fname = f"{dirname}/{logprefix}ini.log"
+    if specific is None:
+        if iout<0:
+            fname = f"{dirname}/{logprefix}ini.log"
+        else:
+            fname = f"{dirname}/{logprefix}{iout:05d}.log"
     else:
-        fname = f"{dirname}/{logprefix}{iout:05d}.log"
+        fname = f"{dirname}/{logprefix}{specific}.log"
     if os.path.isfile(fname) and (not overwrite):
         num = 1
         while os.path.isfile(fname):
-            if iout<0:
-                fname = f"{dirname}/{logprefix}ini_{num}.log"
+            if specific is None:
+                if iout<0:
+                    fname = f"{dirname}/{logprefix}ini_{num}.log"
+                else:
+                    fname = f"{dirname}/{logprefix}{iout:05d}_{num}.log"
             else:
-                fname = f"{dirname}/{logprefix}{iout:05d}_{num}.log"
+                fname = f"{dirname}/{logprefix}{specific}_{num}.log"
             num += 1
     return fname
 
@@ -196,6 +202,14 @@ def dprint_(msg, debugger, level='debug'):
     if debugger is not None:
         if level=='debug':
             debugger.debug(msg)
+        elif level == 'info':
+            debugger.info(msg)
+        elif level == 'warning':
+            debugger.warning(msg)
+        elif level == 'critical':
+            debugger.critical(msg)
+        elif level == 'error':
+            debugger.error(msg)
         else:
             debugger.info(msg)
     else:
@@ -223,6 +237,8 @@ def mode2repo(mode):
     elif mode == 'fornax':
         rurmode = 'fornax'
         repo = '/storage5/FORNAX/KISTI_OUTPUT/l10006'
+    elif mode == 'custom':
+        from custom_mode import repo, rurmode, dp
     else:
         raise ValueError(f"{mode} is currently not supported!")
     return repo, rurmode, dp
@@ -231,11 +247,19 @@ def load_nout(mode='hagn', galaxy=True, double_check=True, useptree=False):
     repo,_,_ = mode2repo(mode)
     if galaxy:
         path = f"{repo}/galaxy"
+        fnames = np.array(os.listdir(path))
     else:
-        path = f"{repo}/halo/DM"
+        try:
+            path = f"{repo}/halo/DM"
+            fnames = np.array(os.listdir(path))
+            if len(fnames)==0:
+                raise ValueError("use halo, not halo/DM")
+        except:
+            path = f"{repo}/halo"
+            fnames = np.array(os.listdir(path))
+
 
     # From GalaxyMaker
-    fnames = np.array(os.listdir(path))
     ind = [True if "tree_bricks" in file else False for file in fnames]
     fnames = fnames[ind]
     lengs = np.array([len(file)-11 for file in fnames])
@@ -246,7 +270,10 @@ def load_nout(mode='hagn', galaxy=True, double_check=True, useptree=False):
 
     if double_check:
         # From output
-        f2 = np.array(os.listdir(repo+"/snapshots"))
+        snappath = repo+"/snapshots"
+        # if mode == 'custom':
+        #     from custom_mode import snappath
+        f2 = np.array(os.listdir(snappath))
         ind = [True if ("output_" in file)&(len(file)<13) else False for file in f2]
         f2 = f2[ind]
         f2 = np.array([int(file[-5:]) for file in f2])
@@ -278,9 +305,9 @@ def out2step(iout, galaxy=True, mode='hagn', nout=None, nstep=None):
         arg = np.argwhere(iout==nout)[0][0]
         return nstep[arg]
     except IndexError:
-        print()
+        print(f"\n!!! {iout} is not in nout({np.min(nout)}~{np.max(nout)}) !!!\n")
         traceback.print_stack()
-        sys.exit(f"\n!!! {iout} is not in nout({np.min(nout)}~{np.max(nout)}) !!!\n")
+        # sys.exit(f"\n!!! {iout} is not in nout({np.min(nout)}~{np.max(nout)}) !!!\n")
 
 def step2out(istep, galaxy=True, mode='hagn', nout=None, nstep=None):
     if nout is None:
@@ -291,9 +318,8 @@ def step2out(istep, galaxy=True, mode='hagn', nout=None, nstep=None):
         arg = np.argwhere(istep==nstep)[0][0]
         return nout[arg]
     except IndexError:
-        print()
+        print(f"\n!!! {istep} is not in nstep({np.min(nstep)}~{np.max(nstep)}) !!!\n")
         traceback.print_stack()
-        sys.exit(f"\n!!! {istep} is not in nstep({np.min(nstep)}~{np.max(nstep)}) !!!\n")
         
     
 

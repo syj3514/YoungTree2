@@ -7,8 +7,8 @@ import inspect
 import psutil
 
 # from tree_utool import *
-if "/home/jeon/YoungTree2" in sys.path:
-    sys.path.append("/home/jeon/YoungTree2")
+if "/home/jeon/YoungTree3" in sys.path:
+    sys.path.append("/home/jeon/YoungTree3")
 from ytool import *
 from yleaf import Leaf
 
@@ -109,7 +109,8 @@ class Treebase():
             func = f"[{inspect.stack()[0][3]}]"; prefix = f"{prefix}{func}({iout}) "
             mem = memory_tracker(prefix, self.debugger)
             # clock = timer(text=prefix, verbose=self.verbose, debugger=self.debugger)
-            self.dict_snap[iout] = uri.RamsesSnapshot(self.repo, iout, mode=self.rurmode, path_in_repo='snapshots')
+            path_in_repo="" if self.simmode[0] == '/' else "snapshots"
+            self.dict_snap[iout] = uri.RamsesSnapshot(self.repo, iout, mode=self.rurmode, path_in_repo=path_in_repo)
             # clock.done()
             mem.done()
         if not iout in self.dict_part.keys():
@@ -131,7 +132,10 @@ class Treebase():
                 mem = memory_tracker(prefix, self.debugger)
 
                 snap = self.load_snap(iout, prefix=prefix)
-                gm, gmpid = uhmi.HaloMaker.load(snap, galaxy=self.galaxy, load_parts=True, double_precision=self.dp) #<-- Bottleneck!
+                path_in_repo = None
+                if (not self.galaxy)&(self.simmode == 'custom'):
+                    path_in_repo = 'halo'
+                gm, gmpid = uhmi.HaloMaker.load(snap, galaxy=self.galaxy, load_parts=True, double_precision=self.dp, path_in_repo=path_in_repo) #<-- Bottleneck!
                 self.dict_gals["galaxymakers"][iout] = gm
                 cumparts = np.insert(np.cumsum(gm["nparts"]), 0, 0)
                 gmpid = tuple(gmpid[ cumparts[i]:cumparts[i+1] ] for i in range(len(gm)))
@@ -147,7 +151,10 @@ class Treebase():
                 mem = memory_tracker(prefix, self.debugger)
 
                 snap = self.load_snap(iout, prefix=prefix)
-                gm = uhmi.HaloMaker.load(snap, galaxy=self.galaxy, load_parts=False, double_precision=self.dp) #<-- Bottleneck!
+                path_in_repo = None
+                if (not self.galaxy)&(self.simmode == 'custom'):
+                    path_in_repo = 'halo'
+                gm = uhmi.HaloMaker.load(snap, galaxy=self.galaxy, load_parts=False, double_precision=self.dp, path_in_repo=path_in_repo) #<-- Bottleneck!
                 self.dict_gals["galaxymakers"][iout] = gm
                 del gm
 

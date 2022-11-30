@@ -186,7 +186,12 @@ def treerecord(iout:int, nout:int, elapse_s:float, total_elapse_s:float, debugge
 
     
 
-def do_onestep(Tree:Treebase, iout:int,p:DotDict, inidebugger:logging.Logger, reftot=0, mode=None, nout=None, nstep=None, resultdir="./")->Main:
+def do_onestep(Tree:Treebase, iout:int,p:DotDict, inidebugger:logging.Logger, **kwargs)->Main:
+    reftot = kwargs.pop("reftot", None)
+    mode = kwargs.pop("mode", None)
+    nout = kwargs.pop("nout", None)
+    nstep = kwargs.pop("nstep", None)
+    resultdir = kwargs.pop("resultdir", None)
     if nout is None:
         nout = load_nout(mode=mode, galaxy=p.galaxy)
     if nstep is None:
