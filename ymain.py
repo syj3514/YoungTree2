@@ -12,8 +12,9 @@ import traceback
 ###############         Tree Building              ######
 #########################################################
 class Main:
-    def __init__(self, Tree:Treebase, resultdir:str="./"):
+    def __init__(self, Tree:Treebase, p:DotDict, resultdir:str="./"):
         self.Tree = Tree
+        self.p = p
         self.resultdir = resultdir
         
     
@@ -26,8 +27,8 @@ class Main:
             func = f"[{inspect.stack()[0][3]}]"; prefix = f"{func}({iout}) "
 
             backups=None
-            if os.path.isfile(f"{resultdir}ytree_{iout:05d}_temp.pickle"):
-                backups, _ = pklload(f"{resultdir}ytree_{iout:05d}_temp.pickle")
+            if os.path.isfile(f"{resultdir}{self.p.logprefix}{iout:05d}_temp.pickle"):
+                backups, _ = pklload(f"{resultdir}{self.p.logprefix}{iout:05d}_temp.pickle")
             Tree.load_snap(iout, prefix=prefix)
             if backups is None:
                 Tree.load_gals(iout, galid='all', return_part=True, prefix=prefix)
@@ -72,7 +73,7 @@ class Main:
                         try:
                             jhalos = Tree.part_halo_match[jout]
                         except:
-                            _, jhalos = pklload(f"{resultdir}ytree_{jout:05d}_temp.pickle")
+                            _, jhalos = pklload(f"{resultdir}{self.p.logprefix}{jout:05d}_temp.pickle")
                     pid = Tree.dict_leaves[iout][key].pid
                     pid = pid[pid <= len(jhalos)]
                     hosts = jhalos[pid-1]
@@ -133,15 +134,15 @@ class Main:
 
                 keys = list(Tree.dict_leaves[iout].keys())
                 backups = {}
-                if os.path.isfile(f"{resultdir}ytree_{iout:05d}_temp.pickle"):
-                    backups, parthalomatch = pklload(f"{resultdir}ytree_{iout:05d}_temp.pickle")
-                    dprint_(f"{prefix} Overwrite `{resultdir}ytree_{iout:05d}_temp.pickle`", Tree.debugger, level='info')
+                if os.path.isfile(f"{resultdir}{self.p.logprefix}{iout:05d}_temp.pickle"):
+                    backups, parthalomatch = pklload(f"{resultdir}{self.p.logprefix}{iout:05d}_temp.pickle")
+                    dprint_(f"{prefix} Overwrite `{resultdir}{self.p.logprefix}{iout:05d}_temp.pickle`", Tree.debugger, level='info')
                 else:
                     parthalomatch = Tree.part_halo_match[iout]
                 for key in keys:
                     if Tree.dict_leaves[iout][key].changed:
                         backups[key] = Tree.dict_leaves[iout][key].selfsave()
-                pklsave((backups, parthalomatch), f"{resultdir}ytree_{iout:05d}_temp.pickle", overwrite=True)
+                pklsave((backups, parthalomatch), f"{resultdir}{self.p.logprefix}{iout:05d}_temp.pickle", overwrite=True)
             del parthalomatch
             del backups
         return _LEAFbackup(Tree, resultdir=resultdir)
@@ -155,19 +156,19 @@ class Main:
         def _reducebackup(Tree:Treebase, iout:int, resultdir="./"):
             prefix = f"[Reduce Backup file] ({iout})"
 
-            if not os.path.isfile(f"{resultdir}ytree_{iout:05d}_temp.pickle"):
-                raise FileNotFoundError(f"`{resultdir}ytree_{iout:05d}_temp.pickle` is not found!")
-            file, _ = pklload(f"{resultdir}ytree_{iout:05d}_temp.pickle")
+            if not os.path.isfile(f"{resultdir}{self.p.logprefix}{iout:05d}_temp.pickle"):
+                raise FileNotFoundError(f"`{resultdir}{self.p.logprefix}{iout:05d}_temp.pickle` is not found!")
+            file, _ = pklload(f"{resultdir}{self.p.logprefix}{iout:05d}_temp.pickle")
             if isinstance(file, dict):
                 keys = list(file.keys())
                 count = 0
                 for key in keys:
                     gals = file[key]['gal'] if count==0 else np.hstack((gals, file[key]['gal']))
                     count += 1
-                pklsave(gals, f"{resultdir}ytree_{iout:05d}.pickle", overwrite=True)
-                dprint_(f"{prefix} Save `{resultdir}ytree_{iout:05d}.pickle`", Tree.debugger, level='info')
-                os.remove(f"{resultdir}ytree_{iout:05d}_temp.pickle")
-                dprint_(f"{prefix} Remove `{resultdir}ytree_{iout:05d}_temp.pickle`", Tree.debugger, level='info')
+                pklsave(gals, f"{resultdir}{self.p.logprefix}{iout:05d}.pickle", overwrite=True)
+                dprint_(f"{prefix} Save `{resultdir}{self.p.logprefix}{iout:05d}.pickle`", Tree.debugger, level='info')
+                os.remove(f"{resultdir}{self.p.logprefix}{iout:05d}_temp.pickle")
+                dprint_(f"{prefix} Remove `{resultdir}{self.p.logprefix}{iout:05d}_temp.pickle`", Tree.debugger, level='info')
             del gals
         return _reducebackup(Tree, iout, resultdir=resultdir)
   
@@ -196,29 +197,29 @@ def do_onestep(Tree:Treebase, iout:int,p:DotDict, inidebugger:logging.Logger, **
         nout = load_nout(mode=mode, galaxy=p.galaxy)
     if nstep is None:
         nstep = load_nstep(mode=mode, galaxy=p.galaxy, nout=nout)
-    main = Main(Tree, resultdir)
+    main = Main(Tree, p, resultdir)
 
     try:
         ref = time.time()
         skip = False
         
         # Fully saved
-        if os.path.isfile(f"{resultdir}ytree_{iout:05d}.pickle"):
+        if os.path.isfile(f"{resultdir}{p.logprefix}{iout:05d}.pickle"):
             dprint_(f"[Queue] {iout} is done --> Skip\n", inidebugger, level='info')
             skip=True
         
         # Temp exists
-        if os.path.isfile(f"{resultdir}ytree_{iout:05d}_temp.pickle"):
-            dprint_(f"[Queue] `{resultdir}ytree_{iout:05d}_temp.pickle` is found", inidebugger, level='info')
+        if os.path.isfile(f"{resultdir}{p.logprefix}{iout:05d}_temp.pickle"):
+            dprint_(f"[Queue] `{resultdir}{p.logprefix}{iout:05d}_temp.pickle` is found", inidebugger, level='info')
             istep = out2step(iout, galaxy=p.galaxy, mode=mode, nout=nout, nstep=nstep)
             cutstep = istep+5
             if cutstep <= np.max(nstep):
                 cutout = step2out(cutstep, galaxy=p.galaxy, mode=mode, nout=nout, nstep=nstep)
-                if os.path.isfile(f"{resultdir}ytree_{cutout:05d}_temp.pickle"):
-                    dprint_(f"[Queue] `{resultdir}ytree_{cutout:05d}_temp.pickle` is found --> Do\n", inidebugger, level='info')
+                if os.path.isfile(f"{resultdir}{p.logprefix}{cutout:05d}_temp.pickle"):
+                    dprint_(f"[Queue] `{resultdir}{p.logprefix}{cutout:05d}_temp.pickle` is found --> Do\n", inidebugger, level='info')
                     skip=False
                 else:
-                    dprint_(f"[Queue] `{resultdir}ytree_{cutout:05d}_temp.pickle` is not found --> Skip\n", inidebugger, level='info')
+                    dprint_(f"[Queue] `{resultdir}{p.logprefix}{cutout:05d}_temp.pickle` is not found --> Skip\n", inidebugger, level='info')
                     skip=True
             else:
                 skip=False

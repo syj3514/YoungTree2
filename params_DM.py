@@ -36,7 +36,7 @@ overwrite = True
 #   [logprefix]
 #   file name of ytree log (./logprefix_iout.log)
 # logprefix = f"ytree_"
-logprefix = f"ytree_"
+logprefix = f"ytree_DM_"
 
 #   [detail]
 #   Detail debugging in log

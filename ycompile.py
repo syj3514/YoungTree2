@@ -82,13 +82,13 @@ print(message)
 yess = ["Y","y","yes", "YES", "Yes"]
 ref = time.time()
 go=True
-if os.path.isfile(f"{yrepo}/ytree_all.pickle"):
-    ans=input(f"You already have `{yrepo}/ytree_all.pickle`. Ovewrite? [Y/N]")
+if os.path.isfile(f"{yrepo}/{p.logprefix}all.pickle"):
+    ans=input(f"You already have `{yrepo}/{p.logprefix}all.pickle`. Ovewrite? [Y/N]")
     go = ans in yess
 if go:
     dprint_("Gather all files...", debugger, level='info')
     for i, iout in enumerate(nout):
-        file = pklload(f"{yrepo}/ytree_{iout:05d}.pickle")
+        file = pklload(f"{yrepo}/{p.logprefix}{iout:05d}.pickle")
         if i==0:
             gals = file
         else:
@@ -117,9 +117,9 @@ if go:
             descscore = gal['desc_score'][:,0]
             gal['desc'] = desc[arg].astype(np.int32)
             gal['desc_score'] = descscore[arg].astype(np.float64)
-    pklsave(gals, f"{yrepo}/ytree_all.pickle", overwrite=True)
-    dprint_(f"`{yrepo}/ytree_all.pickle` saved\n", debugger, level='info')
-gals = pklload(f"{yrepo}/ytree_all.pickle")
+    pklsave(gals, f"{yrepo}/{p.logprefix}all.pickle", overwrite=True)
+    dprint_(f"`{yrepo}/{p.logprefix}all.pickle` saved\n", debugger, level='info')
+gals = pklload(f"{yrepo}/{p.logprefix}all.pickle")
 
 
 
@@ -130,8 +130,8 @@ gals = pklload(f"{yrepo}/ytree_all.pickle")
 #   Connect branch
 #########################################################
 go=True
-if os.path.isfile(f"{yrepo}/ytree_stable.pickle"):
-    ans=input(f"You already have `{yrepo}/ytree_stable.pickle`. Ovewrite? [Y/N]")
+if os.path.isfile(f"{yrepo}/{p.logprefix}stable.pickle"):
+    ans=input(f"You already have `{yrepo}/{p.logprefix}stable.pickle`. Ovewrite? [Y/N]")
     go = ans in yess
 if go:
     dprint_("Make dictionary...", debugger, level='info')
@@ -279,9 +279,9 @@ if go:
         Last[(From==feed[0])&(Last==feed[1])] = feed[3]
     gals['from'] = From
     gals['last'] = Last
-    pklsave(gals, f"{yrepo}/ytree_stable.pickle", overwrite=True)
-    dprint_(f"`{yrepo}/ytree_stable.pickle` saved\n", debugger, level='info')
-# gals = pklload(f"{yrepo}/ytree_stable.pickle")
+    pklsave(gals, f"{yrepo}/{p.logprefix}stable.pickle", overwrite=True)
+    dprint_(f"`{yrepo}/{p.logprefix}stable.pickle` saved\n", debugger, level='info')
+# gals = pklload(f"{yrepo}/{p.logprefix}stable.pickle")
 
 
 
