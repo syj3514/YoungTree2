@@ -10,11 +10,43 @@ import traceback
 import sys
 import importlib
 
-params = importlib.import_module("params")
-ncpu = params.__dict__['ncpu']
+#########################################
+#       Some definition
+#########################################
+
+iparams = importlib.import_module("params")
+ncpu = iparams.__dict__['ncpu']
 if ncpu <=0:
     from numba.core.config import NUMBA_NUM_THREADS
     ncpu = NUMBA_NUM_THREADS
+
+modenames = {"hagn": "Horizon-AGN", 
+            "y01605": "YZiCS-01605",
+            "y04466": "YZiCS-04466",
+            "y05420": "YZiCS-05420",
+            "y05427": "YZiCS-05427",
+            "y06098": "YZiCS-06098",
+            "y07206": "YZiCS-07206",
+            "y10002": "YZiCS-10002",
+            "y17891": "YZiCS-17891",
+            "y24954": "YZiCS-24954",
+            "y29172": "YZiCS-29172",
+            "y29176": "YZiCS-29176",
+            "y35663": "YZiCS-35663",
+            "y36413": "YZiCS-36413",
+            "y36415": "YZiCS-36415",
+            "y39990": "YZiCS-39990",
+            "y49096": "YZiCS-49096",
+            "nh": "NewHorizon",
+            "nh2": "NewHorizon2",
+            "nc": "NewCluster",
+            "fornax": "FORNAX",
+            "custom": "Custom"
+            }
+
+#########################################
+#       Useful Class
+#########################################
 class DebugDecorator:
     def __init__(self, f, ontime=True, onmem=True, oncpu=True):
         self.func = f
@@ -134,6 +166,10 @@ class timer():
                 self.debugger.debug(f"{self.text} Done ({elapse/self.corr:.3f} {self.unit})")
         else:
             print(f"{self.text} Done ({elapse/self.corr:.3f} {self.unit})")
+
+#########################################
+#       Useful Function
+#########################################
 
 def plot(**kwargs):
     import matplotlib.pyplot as plt
@@ -388,6 +424,21 @@ def pklload(fname):
 def distance3d(x,y,z, xs,ys,zs):
     return np.sqrt((x-xs)**2 + (y-ys)**2 + (z-zs)**2)
 
+def cut_box(targets, cx, cy, cz, radius, return_index=False, both_sphere=False):
+    indx = np.abs(targets['x'] - cx)
+    indx[indx>0.5] = 1 - indx[indx>0.5]
+    indy = np.abs(targets['y'] - cy)
+    indy[indy>0.5] = 1 - indy[indy>0.5]
+    indz = np.abs(targets['z'] - cz)
+    indz[indz>0.5] = 1 - indz[indz>0.5]
+    if both_sphere:
+        radius = radius + targets['r']
+    ind = (indx <= radius) & (indy <= radius) & (indz <= radius)
+    if return_index is False:
+        return targets[ind]
+    else:
+        return targets[ind], ind
+
 def cut_sphere(targets, cx, cy, cz, radius, return_index=False, both_sphere=False):
     '''
     Return targets which is closer than radius of (cx,cy,cz)\n
@@ -624,3 +675,42 @@ def skipread_i(f, n, dtype=np.int32):
 def skipread_f(f, n, dtype=np.float64):
     for _ in range(n):
         f.read_reals(dtype)
+
+def gal2id(gal):
+    return gal['timestep']*100000 + gal['id']
+def id2gal(iid):
+    return iid//100000, iid%100000
+
+def gethalo(*args, halos=None):
+    if isinstance(args, tuple):
+        if len(args)==2:
+            iout, iid = args
+        elif len(args)==1:
+            iout = args[0]//100000; iid = args[0]%100000
+        else:
+            raise TypeError(f"{type(args)} is not understood")
+    else:
+        raise TypeError(f"{type(args)} is not understood")
+    return halos[iout][iid-1]
+def maxdesc(halo, all=True, offset=1):
+    if len(halo['desc_score'])<1:
+        return 0, -1
+    arg = np.argmax(halo['desc_score'])
+    if not all:
+        iout = halo['timestep']+offset
+        ind = (halo['desc']//100000 == iout)
+        if not True in ind:
+            return 0, -1
+        arg = np.argmax(halo['desc_score'] * ind)
+    return halo['desc'][arg], halo['desc_score'][arg]
+def maxprog(halo, all=True, offset=1):
+    if len(halo['prog_score'])<1:
+        return 0, -1
+    arg = np.argmax(halo['prog_score'])
+    if not all:
+        iout = halo['timestep']-offset
+        ind = (halo['prog']//100000 == iout)
+        if not True in ind:
+            return 0, -1
+        arg = np.argmax(halo['prog_score'] * ind)
+    return halo['prog'][arg], halo['prog_score'][arg]

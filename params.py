@@ -21,7 +21,7 @@ ncpu = 32
 #   Type of data
 #       True:     Use galaxy and star
 #       False:    Use halo and DM
-galaxy = False
+galaxy = True
 
 #   [nsnap]
 #   How many snapshots to use for each galaxy
